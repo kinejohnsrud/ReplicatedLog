@@ -17,15 +17,15 @@ public class ReplicatedLog {
 	public static void main(String[] args) {
 		ReplicatedLog run = new ReplicatedLog();
 
-		while(true){
+		while(true){		//here is the part that takes input from the console, parses it, and sends it to the right method
 			System.out.println("Enter a command: ");
 			Scanner input = new Scanner(System.in);
 			String operation = input.nextLine();
 			
-			String[] inputElements = operation.toString().split("[\\(\\),]");		//need square brackets?
+			String[] inputElements = operation.toString().split("[\\(\\),]");	//String-array of the 2 or 3 elements of the input
 			int input1 = 0;
 			
-			if(inputElements.length>=2){
+			if(inputElements.length>=2){	//the methods with only one input
 				operation = inputElements[0].toLowerCase();
 				input1 = Integer.parseInt(inputElements[1].replaceAll(" ", "").replaceAll("\"", ""));
 				if(operation.equals("printstate")){
@@ -39,7 +39,7 @@ public class ReplicatedLog {
 				System.out.println("Error");
 			}
 			
-			if(inputElements.length==3){
+			if(inputElements.length==3){	//the method with two inputs
 				String input2 = inputElements[2].replaceAll(" ", "").replaceAll("\"", "");
 				if(operation.equals("increment")){
 					run.increment(input1, input2, true);
@@ -58,13 +58,13 @@ public class ReplicatedLog {
 	}
 	
 	public void increment(int repID, String key, boolean realInput){
-		if(!replicas[repID-1].hashmap.containsKey(key)){
-			replicas[repID-1].hashmap.put(key, 1);
+		if(!replicas[repID-1].hashmap.containsKey(key)){		//makes a hashmap containing the keys and the corresponding value
+			replicas[repID-1].hashmap.put(key, 1);				//creates the key if it does not exist, and sets it to 1
 		}
-		else{
-			replicas[repID-1].hashmap.put(key, replicas[repID-1].hashmap.get(key) + 1);
+		else{													
+			replicas[repID-1].hashmap.put(key, replicas[repID-1].hashmap.get(key) + 1); //adds 1 to existing keys
 		}
-		if(realInput){
+		if(realInput){	//needed in case it is just a receiving replica updating it's own log. Then clock should not be incremented. See receiveLog-method.
 			replicas[repID-1].timeTable[repID-1][repID-1] += 1;
 			int time = replicas[repID-1].timeTable[repID-1][repID-1];
 			Event event = new Event(time,  repID, "Increment(" + key + ")");
@@ -72,7 +72,7 @@ public class ReplicatedLog {
 		}
 	}
 	
-	public void decrement(int repID, String key, boolean realInput){
+	public void decrement(int repID, String key, boolean realInput){ //equal to increment-method, but with -1 instead.
 		if(!replicas[repID-1].hashmap.containsKey(key)){
 			replicas[repID-1].hashmap.put(key, -1);
 		}
@@ -87,7 +87,7 @@ public class ReplicatedLog {
 		}
 	}
 	
-	public void getValue(int replicaID, String key){
+	public void getValue(int replicaID, String key){			//prints the current value of a given key of a given replica
 		if(replicas[replicaID-1].hashmap.containsKey(key)){
 			System.out.println(replicas[replicaID-1].hashmap.get(key));
 		}
@@ -96,13 +96,10 @@ public class ReplicatedLog {
 		}
 	}
 	
-	public void printState(int replicaID){
+	public void printState(int replicaID){			//printing Log and Timetable of given replica
 		System.out.print("Log: {");
 		for (int i = 0; i < replicas[replicaID-1].log.size(); i++) {
 			System.out.print(replicas[replicaID-1].log.get(i).operation);
-//			System.out.print(" repID: " + replicas[replicaID-1].log.get(i).replicaID);
-//			System.out.print(" time: " + replicas[replicaID-1].log.get(i).time);
-
 			if (i!=replicas[replicaID-1].log.size()-1) System.out.print(", ");
 		}
 		System.out.println("}");
@@ -118,13 +115,13 @@ public class ReplicatedLog {
 		//make subset of log to transmit
 		ArrayList<Event> log = new ArrayList<Event>();
 		for(Event event : replica.log){
-			if(!hasrec(replica.timeTable, event, destReplicaID)){
+			if(!hasrec(replica.timeTable, event, destReplicaID)){	//uses hasrec-method as lectured
 				log.add(event);
 			}
 		}
-		int[][] timeTableCopy = deepCopy(replica.timeTable);
+		int[][] timeTableCopy = deepCopy(replica.timeTable);		//made a deep-copy for arrays to prevent shallow copy where they only get different pointers to same object
 		
-		Transmission trans = new Transmission(sourceReplicaID, destReplicaID, timeTableCopy, log, transmissionID);
+		Transmission trans = new Transmission(sourceReplicaID, destReplicaID, timeTableCopy, log, transmissionID); //makes a transmission-object to add to buffer/network
 		buffer.add(trans);
 		System.out.println("Transmission number: " + transmissionID);
 		return transmissionID;
@@ -132,7 +129,7 @@ public class ReplicatedLog {
 	
 	public void receiveLog(int transmissionNumber){
 		Transmission trans = null;
-		//fetches the correct transmission from the buffer
+		//fetches the correct transmission from the buffer based on transmissionNumber
 		for (Transmission transmission : buffer) {
 			if(transmission.transmissionID == transmissionNumber){
 				trans = transmission;
@@ -157,7 +154,7 @@ public class ReplicatedLog {
 		ArrayList<Event> garbageEvents = new ArrayList<Event>();
 		for (Event event : replica.log){
 			int counter = 0;
-			for (int i = 1; i <= 3; i++) {
+			for (int i = 1; i <= 3; i++) {	//uses 3 statically since we have three replicas in this assignment
 				if(hasrec(replica.timeTable, event, i)){
 					counter++;					
 				}
@@ -172,10 +169,10 @@ public class ReplicatedLog {
 		}
 	}
 	
-	public void executeEvent(int replicaID, Event event){
-		String[] blah = event.operation.split("\\(");
-		String operation = blah[0];
-		String key = blah[1].substring(0, blah[1].length()-1);
+	public void executeEvent(int replicaID, Event event){		//this method is for executing the increment and decrement events at a receiving replica, 
+		String[] operationString = event.operation.split("\\("); //and entering "realInput"= false to avoid updating your local clock for these events.
+		String operation = operationString[0];
+		String key = operationString[1].substring(0, operationString[1].length()-1);
 		if(operation.equals("Increment")){
 			increment(replicaID, key, false);
 		}
@@ -184,7 +181,7 @@ public class ReplicatedLog {
 		}
 	}
 	
-	public boolean hasrec(int[][] timeTable, Event event, int destReplicaID){
+	public boolean hasrec(int[][] timeTable, Event event, int destReplicaID){	//the hasrec-method as lectured
 		if(timeTable[destReplicaID-1][event.replicaID-1] >= event.time){
 			return true;
 		}
